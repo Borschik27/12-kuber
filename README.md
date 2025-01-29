@@ -101,4 +101,3 @@ kubeadm join 10.1.1.250:6443 --token fcfn76.79dld9beekk8hpc2 \
 ![image](https://github.com/user-attachments/assets/dab58dd7-d76a-4a30-8f4a-26384c88f458)
 
 ![image](https://github.com/user-attachments/assets/a96eec1f-5f55-41b1-b03b-22f9b1822b76)
->>>>>>> origin/main
