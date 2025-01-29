@@ -15,6 +15,7 @@
 После развертки получаем вот такую структуру:
 
 Узлы:
+
 ![image](https://github.com/user-attachments/assets/bd7f6c12-cf69-49c2-ac90-1b1eb513b017)
 
 LoadBalancer:
