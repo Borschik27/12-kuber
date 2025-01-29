@@ -101,3 +101,12 @@ kubeadm join 10.1.1.250:6443 --token fcfn76.79dld9beekk8hpc2 \
 ![image](https://github.com/user-attachments/assets/dab58dd7-d76a-4a30-8f4a-26384c88f458)
 
 ![image](https://github.com/user-attachments/assets/a96eec1f-5f55-41b1-b03b-22f9b1822b76)
+
+
+Выключим узел kuber01 проверим что доступность не потерялась и посмотрим лог haproxy:
+
+Видим такой лог где показано что все узлы подняты 
+![image](https://github.com/user-attachments/assets/fc84e7ec-9486-4f62-a974-48bf78094564)
+
+Отключим узел:
+![image](https://github.com/user-attachments/assets/e8ae02bf-34b2-456d-beaf-b44949f0bfbe)
