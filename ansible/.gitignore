@@ -1,0 +1,4 @@
+hosts.yaml
+ansible_log
+group_vars
+host_vars

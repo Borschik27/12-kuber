@@ -1,0 +1,4 @@
+---
+# vars file for keep-ha
+# Docker gpg url
+kuber_docker_gpg_key: "https://download.docker.com/linux/ubuntu/gpg"

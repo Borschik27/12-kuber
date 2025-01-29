@@ -1,0 +1,16 @@
+---
+# vars file for kuber
+
+# Pause image versions
+kuber_old_version: '3.8'
+kuber_new_version: '3.10'
+
+# Container runtime endpoints
+kuber_runtime_endpoint: "unix:///var/run/containerd/containerd.sock"
+kuber_image_endpoint: "unix:///var/run/containerd/containerd.sock"
+
+# Docker gpg url
+kuber_docker_gpg_key: "https://download.docker.com/linux/ubuntu/gpg"
+
+# Kubernetes version
+kubernetes_version: 1.32
