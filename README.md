@@ -110,3 +110,36 @@ kubeadm join 10.1.1.250:6443 --token fcfn76.79dld9beekk8hpc2 \
 
 Отключим узел:
 ![image](https://github.com/user-attachments/assets/e8ae02bf-34b2-456d-beaf-b44949f0bfbe)
+
+Видно что haproxy потерял узел но кластер еще работает проверим ноды со второго мастера
+![image](https://github.com/user-attachments/assets/d0330576-3c97-4662-af17-9d1bea507f48)
+
+Видим что ноды нет но кластер работает
+![image](https://github.com/user-attachments/assets/9149567a-4ac6-4493-9d8e-9bde9d7a2a39)
+```
+ubuntu@kuber02:~$ curl -k https://10.1.1.250:6443
+{
+  "kind": "Status",
+  "apiVersion": "v1",
+  "metadata": {},
+  "status": "Failure",
+  "message": "forbidden: User \"system:anonymous\" cannot get path \"/\"",
+  "reason": "Forbidden",
+  "details": {},
+  "code": 403
+}
+```
+Уроним haproxy01 Проверим балансировщик и проверим что все так же можно попасть на кластер
+![image](https://github.com/user-attachments/assets/15e09dc5-4b8d-41d4-a798-5e7d3ac3b901)
+
+![image](https://github.com/user-attachments/assets/a6636953-7473-4500-8f47-6cf1b317bba2)
+
+Видим что доступ получаем доступ
+![image](https://github.com/user-attachments/assets/86919912-5990-47fa-ab8e-3ff30985f79f)
+
+Отрубим 2 haproxy И вилим что доступ пропал
+
+![image](https://github.com/user-attachments/assets/a6825668-8884-4a68-b362-614c18b14b51)
+
+
+![image](https://github.com/user-attachments/assets/9bc63c02-511b-469d-9139-d5344d7c68b0)
