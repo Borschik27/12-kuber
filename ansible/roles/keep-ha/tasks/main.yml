@@ -1,0 +1,75 @@
+---
+# tasks file for keep-ha
+# Update/upgrade disto and install first packages
+- name: Update apt package cache
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: true
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - git
+      - wget
+      - python3-apt
+      - ssh
+      - keepalived
+      - haproxy
+    state: present
+# End Update/Upgrade disto
+
+# Add Docker repo
+- name: Create the keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Docker GPG key
+  ansible.builtin.get_url:
+    url: "{{ kuber_docker_gpg_key }}"
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+
+- name: Add Docker repository to Apt sources
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+# End add Docker repo
+
+# Add PasswordAuthentication for SSH
+- name: Ensure PasswordAuthentication is set to yes
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication\s+.*'
+    line: 'PasswordAuthentication yes'
+    state: present
+
+- name: Ensure PubkeyAuthentication is set to yes
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PubkeyAuthentication\s+.*'
+    line: 'PubkeyAuthentication yes'
+    state: present
+  notify:
+    - Restart SSH service
+# End PasswordAuthentication for SSH
+
+- name: Update APT package index again
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Copy HAProxy
+  ansible.builtin.copy:
+    src: haproxy.cfg
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify:
+    - Restart HAProxy service

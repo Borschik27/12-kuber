@@ -1,0 +1,21 @@
+---
+- name: Config local
+  hosts: localhost
+
+- name: Install master
+  hosts: masters
+  become: true
+  roles:
+    - kuber
+
+- name: Install agent
+  hosts: workers
+  become: true
+  roles:
+    - worker
+
+- name: Install ha-proxy
+  hosts: ha-proxy
+  become: true
+  roles:
+    - keep-ha

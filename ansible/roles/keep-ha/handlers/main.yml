@@ -1,0 +1,11 @@
+---
+# handlers file for keep-ha
+- name: Restart SSH service
+  ansible.builtin.systemd:
+    name: ssh
+    state: restarted
+
+- name: Restart HAProxy service
+  ansible.builtin.systemd:
+    name: haproxy
+    state: restarted

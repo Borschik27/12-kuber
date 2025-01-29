@@ -1,0 +1,14 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: <ip-address>
+  bindPort: 6443
+
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+networking:
+  podSubnet: 192.168.240.0/24 # Default CIRD 192.168.0.0/16
+  serviceSubnet: 10.96.0.0/24 # Default mask /12
+  dnsDomain: cluster.local
+controlPlaneEndpoint: <network-lb>:<port>

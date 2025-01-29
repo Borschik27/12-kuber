@@ -1,0 +1,19 @@
+---
+# handlers file for kuber
+- name: Restart SSH service
+  ansible.builtin.systemd:
+    name: ssh
+    state: restarted
+
+- name: Restart containerd service
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+
+- name: Restart kubelet service
+  ansible.builtin.systemd:
+    name: kubelet
+    state: restarted
+
+- name: Reload sysctl
+  ansible.builtin.command: sysctl --system

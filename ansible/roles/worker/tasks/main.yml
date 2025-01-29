@@ -1,0 +1,254 @@
+---
+# tasks file for worker
+# Update/upgrade disto and install first packages
+- name: Update apt package cache
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: true
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - git
+      - wget
+      - python3-apt
+      - ssh
+    state: present
+# End Update/Upgrade disto
+
+# Add Docker repo
+- name: Create the keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Docker GPG key
+  ansible.builtin.get_url:
+    url: "{{ kuber_docker_gpg_key }}"
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+
+- name: Add Docker repository to Apt sources
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+# End add Docker repo
+
+# Fetch Kuber version and add kubernetes repo
+# - name: Fetch the latest Kubernetes version from GitHub
+#   ansible.builtin.uri:
+#     url: https://api.github.com/repos/kubernetes/kubernetes/releases/latest
+#     return_content: true
+#   register: github_release
+
+# - name: Set Kubernetes version fact
+#   ansible.builtin.set_fact:
+#     kubernetes_version: "{{ github_release.json.tag_name | regex_replace('v', '') }}"
+
+# # Show Kuber version if needed
+# - name: Show the Kubernetes version
+#   debug:
+#     msg: "The latest Kubernetes version is {{ kubernetes_version }}"
+# #
+
+- name: Add Kubernetes APT key
+  ansible.builtin.shell:
+    cmd: "curl -fsSL https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg"
+  args:
+    creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+- name: Set permissions on the Kubernetes APT keyring
+  ansible.builtin.file:
+    path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    mode: '0644'
+
+- name: Add Kubernetes repository
+  ansible.builtin.lineinfile:
+    path: /etc/apt/sources.list.d/kubernetes.list
+    line: 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/ /'
+    create: true
+
+- name: Set permissions on the Kubernetes sources list
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/kubernetes.list
+    mode: '0644'
+
+# End add Kubernetes
+
+# Add PasswordAuthentication for SSH
+- name: Ensure PasswordAuthentication is set to yes
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication\s+.*'
+    line: 'PasswordAuthentication yes'
+    state: present
+
+- name: Ensure PubkeyAuthentication is set to yes
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PubkeyAuthentication\s+.*'
+    line: 'PubkeyAuthentication yes'
+    state: present
+  notify:
+    - Restart SSH service
+# End PasswordAuthentication for SSH
+
+- name: Update APT package index again
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+      - containerd.io
+    state: present
+
+- name: Hold kubelet, kubeadm, kubectl packages
+  ansible.builtin.command:
+    cmd: apt-mark hold "{{ item }}"
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+  changed_when: false
+
+- name: Enable and start kubelet service
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: true
+    state: started
+
+# Create add system config
+- name: Create k8s modules load configuration
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Load overlay module
+  community.general.modprobe:
+    name: overlay
+    state: present
+
+- name: Load br_netfilter module
+  community.general.modprobe:
+    name: br_netfilter
+    state: present
+
+- name: Create sysctl configuration for Kubernetes
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/10-k8s.conf
+    content: |
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      net.ipv4.ip_forward = 1
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Reload sysctl
+
+- name: Turn off swap
+  command: swapoff -a
+
+- name: Run sed command to comment out swap entry
+  command: sed -i '/swap/ s/^/#/' /etc/fstab
+
+- name: Generate and save the default containerd config
+  ansible.builtin.shell: |
+    containerd config default | tee /etc/containerd/config.toml
+
+# Disabled if you not use SystemdCgroup
+- name: Replace SystemdCgroup in containerd config
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+
+# Set you version in vars
+- name: Update sandbox_image version to 3.10
+  ansible.builtin.replace:
+    path: /etc/containerd/config.toml
+    regexp: 'sandbox_image = "registry.k8s.io/pause:{{ kuber_old_version }}"'
+    replace: 'sandbox_image = "registry.k8s.io/pause:{{ kuber_new_version }}"'
+
+# Set your container runtime brocker
+- name: Add crictl config
+  ansible.builtin.copy:
+    dest: /etc/crictl.yaml
+    content: |
+      runtime-endpoint: {{ kuber_runtime_endpoint }}
+      image-endpoint: {{ kuber_image_endpoint }}
+      timeout: 3
+      debug: false
+      pull-image-on-create: false
+      disable-pull-on-run: false
+    owner: root
+    group: root
+    mode: '0644'
+
+# ### If needed CNI other CNI plugins or Nerdctl used this
+# - name: Fetch the latest CNI version from GitHub
+#   ansible.builtin.uri:
+#     url: https://api.github.com/repos/containernetworking/plugins/releases/latest
+#     return_content: yes
+#   register: github_release
+
+# - name: Set Kubernetes version fact
+#   ansible.builtin.set_fact:
+#     cni_version: "{{ github_release.json.tag_name | regex_replace('v', '') }}"
+
+# - name: Download the latest CNI release
+#   ansible.builtin.get_url:
+#     url: "https://github.com/containernetworking/plugins/releases/download/v{{ cni_version }}/cni-plugins-linux-amd64-v{{ cni_version }}.tgz"
+#     dest: "/tmp/cni-plugins-linux-amd64-v{{ cni_version }}.tgz"
+#     mode: '0755'
+
+# - name: Extract CNI plugins
+#   ansible.builtin.unarchive:
+#     src: "/tmp/cni-plugins-linux-amd64-v{{ cni_version }}.tgz"
+#     dest: "/opt/cni/bin/"
+#     remote_src: yes
+
+# - name: Fetch the latest nerdctl version from GitHub
+#   ansible.builtin.uri:
+#     url: https://api.github.com/repos/containerd/nerdctl/releases/latest
+#     return_content: yes
+#   register: github_release
+
+# - name: Set nerdctl version fact
+#   ansible.builtin.set_fact:
+#     nerdctl_version: "{{ github_release.json.tag_name | regex_replace('v', '') }}"
+
+# - name: Download the latest nerdctl release
+#   ansible.builtin.get_url:
+#     url: "https://github.com/containerd/nerdctl/releases/download/v{{ nerdctl_version }}/nerdctl-{{ nerdctl_version }}-linux-amd64.tar.gz"
+#     dest: "/tmp/nerdctl-{{ nerdctl_version }}-linux-amd64.tar.gz"
+#     mode: '0755'
+
+# - name: Extract nerdctl CLI
+#   ansible.builtin.unarchive:
+#     src: "/tmp/nerdctl-{{ nerdctl_version }}-linux-amd64.tar.gz"
+#     dest: "/usr/local/bin"
+#     remote_src: yes
+# ### End CNI Nerdctl
+
+- name: Restart necessary services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - containerd
+    - kubelet
